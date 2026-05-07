@@ -143,14 +143,23 @@ classdef MeanResponseFigure < symphonyui.core.FigureHandler
                 sweep.parameters = parameters;
                 sweep.count = 1;
                 obj.sweeps{end + 1} = sweep;
-                
-                % Get the the legend value.
+
+                % Get the legend value. Skipped when groupBy was empty
+                % (parameters is an empty containers.Map) — protocols
+                % like LedWeightModulation pass 'groupBy', {} to mean
+                % "no grouping", and indexing k{1} on an empty cell
+                % otherwise throws an MException that the legacy
+                % dotnetcli bridge can't marshal back to .NET (surfaces
+                % as the cryptic "Conversion to char from MException is
+                % not possible" error).
                 k = parameters.keys;
-                v = parameters(k{1});
-                if ~ischar(v)
-                    v = num2str(v);
+                if ~isempty(k)
+                    v = parameters(k{1});
+                    if ~ischar(v)
+                        v = num2str(v);
+                    end
+                    obj.legendValues{end + 1} = v;
                 end
-                obj.legendValues{end + 1} = v;
             else
                 sweep = obj.sweeps{obj.sweepIndex};
                 cy = get(sweep.line, 'YData');
