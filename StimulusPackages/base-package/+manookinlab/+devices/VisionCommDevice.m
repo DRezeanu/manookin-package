@@ -1,5 +1,4 @@
-
-classdef MEADevice < symphonyui.core.Device
+classdef VisionCommDevice < symphonyui.core.Device
     
     properties
         fileName
@@ -14,7 +13,7 @@ classdef MEADevice < symphonyui.core.Device
     
     methods
         
-        function obj = MEADevice(port)
+        function obj = VisionCommDevice(port)
             
             cobj = Symphony.Core.UnitConvertingExternalDevice('MEA@localhost', 'Unspecified', Symphony.Core.Measurement(0, symphonyui.core.Measurement.UNITLESS));
 %             cobj = Symphony.Core.UnitConvertingExternalDevice(['MEA@' ip.Results.host], 'Unspecified', Symphony.Core.Measurement(0, symphonyui.core.Measurement.UNITLESS));
@@ -28,7 +27,7 @@ classdef MEADevice < symphonyui.core.Device
 %             import edu.ucsc.neurobiology.vision.util.*;
 %             
             if nargin < 1
-                port = 9001;
+                port = 9002;
             end
             
             obj.readTimeout = 10000; % Timeout in milliseconds
@@ -48,13 +47,9 @@ classdef MEADevice < symphonyui.core.Device
         function start(obj)
             import java.io.*;
             import java.net.*;
-            import java.util.ArrayList;
-            import java.util.Collections;
-            import java.util.List;
-            import edu.ucsc.neurobiology.vision.util.*;
-            
+
             obj.stopRequested = false;
-            
+
             disp('Creating server socket...');
             try
                 obj.server = ServerSocket(obj.port);
@@ -71,16 +66,21 @@ classdef MEADevice < symphonyui.core.Device
                         % Get the data stream.
                         inputStream = clientSocket.getInputStream();
 
-                        % Parse the header from the input stream.
-                        h = edu.ucsc.neurobiology.vision.io.RawDataHeader512(inputStream);
-
-                        obj.fileName = [char(h.getExperimentIdentifier()), '\',char(h.getDatasetName()), '.bin'];
-                        disp(obj.fileName)
+                        % Read the filename via the lightweight side-channel protocol.
+                        % The Java side sends the filename using DataOutputStream.writeUTF(),
+                        % which we read here with DataInputStream.readUTF().
+                        % This connection is completely independent of the data streaming
+                        % pipeline, so closing it has no effect on other output streams.
+                        dis = java.io.DataInputStream(inputStream);
+                        obj.fileName = char(dis.readUTF());
+                        disp(['Received filename: ', obj.fileName]);
 
                         obj.stopRequested = true;
 
-                        % Close the socket.
-                        inputStream.close();
+                        % Close the side-channel socket. This is safe because it's
+                        % a dedicated connection just for the filename, not part of
+                        % the data streaming pipeline.
+                        dis.close();
                         clientSocket.close();
                     catch x
                         if strcmp(x.identifier, 'TcpListen:AcceptTimeout')
