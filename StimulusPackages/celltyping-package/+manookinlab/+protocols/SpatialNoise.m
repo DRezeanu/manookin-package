@@ -235,8 +235,8 @@ classdef SpatialNoise < manookinlab.protocols.ManookinLabStageProtocol
                         else
                             M = 2*(obj.noiseStreamRep.rand(obj.numYStixels,obj.numXStixels,3)>0.5)-1;
                         end
+                         M = obj.contrast*M*obj.backgroundIntensity + obj.backgroundIntensity;
                     end
-                    M = obj.contrast*M*obj.backgroundIntensity + obj.backgroundIntensity;
                 else
                     M = obj.imageMatrix;
                 end
