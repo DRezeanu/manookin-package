@@ -69,9 +69,9 @@ classdef SpatialNoise < manookinlab.protocols.ManookinLabStageProtocol
             
             % Get the number of frames.
             obj.numFrames = floor(obj.stimTime * 1e-3 * obj.frameRate)+15;
-            obj.pre_frames = round(obj.preTime * 1e-3 * 60.0);
-            obj.unique_frames = round(obj.uniqueTime * 1e-3 * 60.0);
-            obj.repeat_frames = round(obj.repeatTime * 1e-3 * 60.0);
+            obj.pre_frames = round(obj.preTime * 1e-3 * obj.frameRate);
+            obj.unique_frames = round(obj.uniqueTime * 1e-3 * obj.frameRate);
+            obj.repeat_frames = round(obj.repeatTime * 1e-3 * obj.frameRate);
 
             if strcmpi(obj.stageClass, 'LightCrafter')
                 obj.chromaticClass = 'achromatic';
