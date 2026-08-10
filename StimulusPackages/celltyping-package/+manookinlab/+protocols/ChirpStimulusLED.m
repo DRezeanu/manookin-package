@@ -23,6 +23,12 @@ classdef ChirpStimulusLED < edu.washington.riekelab.protocols.RiekeLabProtocol
     properties (Dependent, SetAccess = private)
         amp2                            % Secondary amplifier
     end
+
+    properties (Dependent)
+        preTime
+        stimTime
+        tailTime
+    end
     
     properties
         numberOfAverages = uint16(3)    % Number of epochs
@@ -127,6 +133,18 @@ classdef ChirpStimulusLED < edu.washington.riekelab.protocols.RiekeLabProtocol
                 i = find(~ismember(amps, obj.amp), 1);
                 a = amps{i};
             end
+        end
+
+        function t = get.preTime(obj)
+            t = obj.interTime;
+        end
+
+        function t = get.stimTime(obj)
+            t = obj.interTime*3 + obj.stepTime*2 + obj.frequencyTime + obj.contrastTime;
+        end
+
+        function t = get.tailTime(obj)
+            t = obj.interTime;
         end
         
     end

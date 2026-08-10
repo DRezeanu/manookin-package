@@ -1,4 +1,6 @@
-function frameValues = getSpatialNoiseFrames(numXChecks, numYChecks, numFrames, noiseClass, chromaticClass, seed)
+function frameValues = getSpatialNoiseFrames_legacy(numXChecks, numYChecks, numFrames, noiseClass, chromaticClass, seed)
+% This function regenerates the sequence of frames from the legacy
+% 'SpatialNoise' protocol.
 
 % Seed the random number generator.
 noiseStream = RandStream('mt19937ar', 'Seed', seed);
