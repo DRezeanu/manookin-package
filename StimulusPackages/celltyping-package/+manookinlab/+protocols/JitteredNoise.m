@@ -70,11 +70,13 @@ classdef JitteredNoise < manookinlab.protocols.ManookinLabStageProtocol
 
             if ~strcmp(obj.onlineAnalysis, 'none')
                 obj.showFigure('manookinlab.figures.JitteredNoiseFigure', ...
-                    obj.rig.getDevice(obj.amp),'recordingType', obj.onlineAnalysis,... 
+                    obj.rig.getDevice(obj.amp),'recordingType', obj.onlineAnalysis,...
+                    'chromaticClass',obj.chromaticClass,...
                     'stixelSize', obj.stixelSize, 'stepsPerStixel', double(obj.stepsPerStixel),...
                     'numXChecks', obj.numXChecks, 'numYChecks', obj.numYChecks,...
                     'preTime', obj.preTime, 'stimTime', obj.stimTime, ...
-                    'frameRate', obj.frameRate, 'numFrames', obj.numFrames);
+                    'frameRate', obj.frameRate, 'numFrames', obj.numFrames, ...
+                    'frameDwell', double(obj.frameDwell));
             end
             
             if ~strcmp(obj.chromaticClass,'achromatic') && ~strcmpi(obj.stageClass, 'LightCrafter')
@@ -158,20 +160,20 @@ classdef JitteredNoise < manookinlab.protocols.ManookinLabStageProtocol
                     obj.imageMatrix(:,:,:,2) = yellow_matrix;
                     obj.imageMatrix(:,:,:,3) = blue_matrix;
                 else
-                obj.imageMatrix = manookinlab.util.getJitteredNoiseFrames(obj.numXStixels, obj.numYStixels, obj.numXChecks, obj.numYChecks, obj.numFrames, obj.stepsPerStixel, obj.seed, obj.frameDwell);
-                tmp = repmat(obj.imageMatrix,[1,1,1,3]);
-                for k = 1 : 3
-                    tmp(:,:,:,k) = obj.colorWeights(k)*tmp(:,:,:,k);
-                end
-                
-                switch obj.chromaticClass
-                    case 'yellow'
-                        tmp(:,:,:,3) = -1;
-                    case 'blue'
-                        tmp(:,:,:,1:2) = -1;
-                end
-                
-                obj.imageMatrix = tmp;
+                    obj.imageMatrix = manookinlab.util.getJitteredNoiseFrames(obj.numXStixels, obj.numYStixels, obj.numXChecks, obj.numYChecks, obj.numFrames, obj.stepsPerStixel, obj.seed, obj.frameDwell);
+                    tmp = repmat(obj.imageMatrix,[1,1,1,3]);
+                    for k = 1 : 3
+                        tmp(:,:,:,k) = obj.colorWeights(k)*tmp(:,:,:,k);
+                    end
+
+                    switch obj.chromaticClass
+                        case 'yellow'
+                            tmp(:,:,:,3) = -1;
+                        case 'blue'
+                            tmp(:,:,:,1:2) = -1;
+                    end
+
+                    obj.imageMatrix = tmp;
                 end
             else
                 obj.imageMatrix = manookinlab.util.getJitteredNoiseFrames(obj.numXStixels, obj.numYStixels, obj.numXChecks, obj.numYChecks, obj.numFrames, obj.stepsPerStixel, obj.seed, obj.frameDwell);

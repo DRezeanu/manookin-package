@@ -1,98 +1,144 @@
-function sta_tmp = analyzeSpatialNoise(response, frame_times, noiseClass, parameters, seed, varargin)
-
-
-validNoiseTypes = {'jittered','fast','spatial','spatial_legacy','pink','binary','gaussian','uniform','ternary'};
+function [strf, spaceFilter] = analyzeSpatialNoise(response, varargin)
+% ANALYZESPATIALNOISE Compute the spatiotemporal receptive field for the
+% SpatialNoise (FastNoise) stimulus by reverse correlation.
+%
+%   [strf, spaceFilter] = analyzeSpatialNoise(response, ...)
+%
+% Inputs:
+%   response : response binned at the frame rate (one bin per stimulus
+%              frame, e.g. spike counts from BinSpikeRate).
+%
+% Named parameters:
+%   numXStixels, numYStixels : stixel grid dimensions (epoch parameters).
+%   numXChecks, numYChecks   : check dimensions (epoch parameters).
+%   chromaticClass  : 'achromatic', 'BY', 'RGB', ... (default 'achromatic')
+%   numFrames       : total number of stimulus frames (default numel(response)).
+%   stepsPerStixel  : jitter steps per stixel (default 1).
+%   seed            : random seed for the unique sequence.
+%   frameDwell      : monitor frames per stimulus frame (default 1).
+%   uniqueFrames    : number of frames of unique (seeded) noise. Frames
+%                     beyond this come from the repeating sequence.
+%                     (default: all frames unique)
+%   repeatFrames    : number of repeating-sequence frames (default 0).
+%   repeatingSeed   : seed of the repeating sequence (default 1).
+%   gaussianFilter  : whether the stixels were blurred (default false).
+%   filterSdStixels : Gaussian filter SD in stixels (default 1.0).
+%   frameRate       : monitor frame rate in Hz (default 60).
+%   filterFrames    : number of time lags in the filter
+%                     (default floor(frameRate/2)).
+%
+% Outputs:
+%   strf        : (numYChecks x numXChecks x filterFrames x nChannels)
+%                 spatiotemporal receptive field. Channels are: achromatic
+%                 and single-color classes -> 1; 'BY' -> [yellow, blue];
+%                 'RGB' -> [red, green, blue].
+%   spaceFilter : (numYChecks x numXChecks x nChannels) spatial RF averaged
+%                 over the dominant time lobe.
 
 ip = inputParser();
-addRequired(ip, 'response', @(x) isnumeric(x) && isscalar(x));
-addRequired(ip, 'frame_times', @(x) isnumeric(x));
-addRequired(ip, 'parameters',@(x) isa(x, 'containers.Map'));
-addRequired(ip, 'seed', @(x) isfloat(x) && isscalar(x));
-addParameter(ip,'noiseClass','jittered',...
-     @(x) any(validatestring(x,validNoiseTypes)));
-addParameter(ip, 'method', 'fft', @(x)isstring(x));
-addParameter(ip, 'timeBins', 31, @(x) isfloat(x) && isscalar(x));
-addParameter(ip, 'binsPerFrame', 1, @(x) isfloat(x) && isscalar(x));
-addParameter(ip, 'responseType', 'spikeTimes', @(x) isstring(x))
-parse(ip, response, frame_times, noiseClass, parameters, seed, varargin{:});
-% 
-ops = ip.Results;
+ip.addParameter('numXStixels', [], @(x)isfloat(x));
+ip.addParameter('numYStixels', [], @(x)isfloat(x));
+ip.addParameter('numXChecks', [], @(x)isfloat(x));
+ip.addParameter('numYChecks', [], @(x)isfloat(x));
+ip.addParameter('chromaticClass', 'achromatic', @(x)ischar(x));
+ip.addParameter('numFrames', [], @(x)isfloat(x));
+ip.addParameter('stepsPerStixel', 1, @(x)isfloat(x));
+ip.addParameter('seed', 1, @(x)isfloat(x));
+ip.addParameter('frameDwell', 1, @(x)isfloat(x));
+ip.addParameter('uniqueFrames', [], @(x)isfloat(x));
+ip.addParameter('repeatFrames', 0, @(x)isfloat(x));
+ip.addParameter('repeatingSeed', 1, @(x)isfloat(x));
+ip.addParameter('gaussianFilter', false, @(x)islogical(x) || isfloat(x));
+ip.addParameter('filterSdStixels', 1.0, @(x)isfloat(x));
+ip.addParameter('frameRate', 60.0, @(x)isfloat(x));
+ip.addParameter('filterFrames', [], @(x)isfloat(x));
+ip.parse(varargin{:});
 
-% Regenerate the frame sequence.
-frameValues = manookinlab.util.regenerate_spatial_noise(ops.noiseClass, ops.parameters, ops.seed);
+numXStixels = ip.Results.numXStixels;
+numYStixels = ip.Results.numYStixels;
+numXChecks = ip.Results.numXChecks;
+numYChecks = ip.Results.numYChecks;
+chromaticClass = ip.Results.chromaticClass;
+numFrames = ip.Results.numFrames;
+stepsPerStixel = double(ip.Results.stepsPerStixel);
+seed = ip.Results.seed;
+frameDwell = double(ip.Results.frameDwell);
+uniqueFrames = ip.Results.uniqueFrames;
+repeatFrames = ip.Results.repeatFrames;
+repeatingSeed = ip.Results.repeatingSeed;
+gaussianFilter = logical(ip.Results.gaussianFilter);
+filterSdStixels = ip.Results.filterSdStixels;
+frameRate = ip.Results.frameRate;
+filterFrames = ip.Results.filterFrames;
 
-% Upsample frames, if needed.
-if ops.binsPerFrame > 1
-    frameValues = up_frames(frameValues, ops.binsPerFrame);
-    f_times = [];
-    for jj = 1:length(frame_times)-1
-        f_tmp = linspace(frame_times(jj),frame_times(jj+1),binsPerFrame+1);
-        f_times = [f_times, f_tmp(1:end-1)]; %#ok<AGROW>
-    end
-    f_times = [f_times, frame_times(end)]; 
-    frame_times = f_times;
+y = response(:);
+
+if isempty(numFrames)
+    numFrames = numel(y);
 end
-frameValues = frameValues(:,:,1:length(frame_times)-1,:);
-
-switch ops.method
-    case 'fft'
-        sta_tmp = compute_sta_fft(ops.response, frameValues, ops.timeBins);
-end
-end
-
-function upFrames = up_frames(frames, multiple)
-% 
-% frames 
-%   4-D: [x,y,t,color]
-% multiple: integer multiple (>1)
-
-if multiple <= 1
-    upFrames = frames;
-    return;
+if isempty(filterFrames)
+    filterFrames = floor(frameRate * 0.5);
 end
 
-% Determine the dimensions.
-n = ndims(frames);
-
-if n == 2
-    upFrames = zeros(size(frames,1), size(frames,2)*multiple);
-    
-    for frameIndex = 1 : size(frames,2)*multiple
-        fIndex = ceil(frameIndex / multiple);
-        upFrames(:,frameIndex) = frames(:,fIndex);
-    end
-    
-elseif n == 3
-    upFrames = zeros(size(frames,1), size(frames,2), size(frames,3)*multiple);
-    
-    for frameIndex = 1 : size(frames,3)*multiple
-        fIndex = ceil(frameIndex / multiple);
-        upFrames(:,:,frameIndex) = frames(:,:,fIndex);
-    end
-elseif n == 4
-    upFrames = zeros(size(frames,1), size(frames,2), size(frames,3)*multiple, size(frames,4));
-    
-    for frameIndex = 1 : size(frames,3)*multiple
-        fIndex = ceil(frameIndex / multiple);
-        upFrames(:,:,frameIndex,:) = frames(:,:,fIndex,:);
-    end
+% Regenerate the stimulus: (numYChecks x numXChecks x t x 3) contrasts.
+if ~isempty(uniqueFrames) && repeatFrames > 0 && uniqueFrames < numFrames
+    % Unique (seeded) segment followed by the repeating segment.
+    stim = manookinlab.util.getSpatialNoiseFrames(numXStixels, numYStixels, ...
+        numXChecks, numYChecks, chromaticClass, uniqueFrames, ...
+        stepsPerStixel, seed, frameDwell, gaussianFilter, filterSdStixels);
+    stim = stim(:, :, 1 : min(end, uniqueFrames), :);
+    stimRep = manookinlab.util.getSpatialNoiseFrames(numXStixels, numYStixels, ...
+        numXChecks, numYChecks, chromaticClass, numFrames - uniqueFrames, ...
+        stepsPerStixel, repeatingSeed, frameDwell, gaussianFilter, filterSdStixels);
+    stimRep = stimRep(:, :, 1 : min(end, numFrames - uniqueFrames), :);
+    stim = cat(3, stim, stimRep);
 else
-    error('Number of dimensions must be either 2, 3 or 4!');
-end
+    stim = manookinlab.util.getSpatialNoiseFrames(numXStixels, numYStixels, ...
+        numXChecks, numYChecks, chromaticClass, numFrames, ...
+        stepsPerStixel, seed, frameDwell, gaussianFilter, filterSdStixels);
 end
 
+% Match the response and stimulus lengths.
+nT = min(numel(y), size(stim, 3));
+y = y(1 : nT);
+stim = stim(:, :, 1 : nT, :);
 
-function sta_tmp = compute_sta_fft(response, frameValues, nkt)
-sta_tmp = zeros(size(frameValues,1),size(frameValues,2),nkt,3);
-for jj = 1 : size(frameValues,1)
-    for kk = 1 : size(frameValues,2)
-        for mm = 1:3
-            stim_tmp = squeeze(frameValues(jj,kk,:,mm))';
-            foo = ifft(fft(response) .* conj(fft(stim_tmp)));
-            sta_tmp(jj,kk,:,mm) = foo(1:nkt);
+% Zero out the first second while the cell is adapting to the stimulus,
+% and the last 15 (padding) frames.
+adaptFrames = min(floor(frameRate), nT);
+y(1 : adaptFrames) = 0;
+stim(:, :, 1 : adaptFrames, :) = 0;
+if nT > 15
+    y(end - 14 : end) = 0;
+    stim(:, :, end - 14 : end, :) = 0;
+end
+
+% Pick the informative color channels.
+if strcmpi(chromaticClass, 'BY')
+    channels = [1, 3]; % yellow (R=G), blue
+elseif strcmpi(chromaticClass, 'RGB')
+    channels = [1, 2, 3];
+else
+    channels = 1; % all three channels are identical
+end
+nChannels = numel(channels);
+
+% Reverse correlation via FFT for each check and channel.
+strf = zeros(numYChecks, numXChecks, filterFrames, nChannels);
+fftY = fft([y; zeros(60, 1)]);
+for c = 1 : nChannels
+    for m = 1 : numYChecks
+        for n = 1 : numXChecks
+            s = double(squeeze(stim(m, n, :, channels(c))));
+            tmp = ifft(fftY .* conj(fft([s; zeros(60, 1)])));
+            strf(m, n, :, c) = tmp(1 : filterFrames);
         end
     end
 end
+
+% Spatial RF averaged over the dominant time lobe.
+lobePts = 2 : min(4, filterFrames);
+spaceFilter = reshape(mean(strf(:, :, lobePts, :), 3), ...
+    [numYChecks, numXChecks, nChannels]);
+
 end
-
-

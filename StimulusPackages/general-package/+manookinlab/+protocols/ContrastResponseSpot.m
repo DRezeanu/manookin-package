@@ -195,11 +195,7 @@ classdef ContrastResponseSpot < manookinlab.protocols.ManookinLabStageProtocol
             p.addController(spotVisible);
             % Control the spot color.
             if ~strcmpi(obj.temporalClass, 'pulse-positive') && ~strcmpi(obj.temporalClass, 'pulse-negative')
-                if strcmp(obj.stageClass, 'LcrRGB')
-                    colorController = stage.builtin.controllers.PropertyController(spot, 'color', ...
-                        @(state)getSpotColorLcrRGB(obj, state));
-                    p.addController(colorController);
-                elseif strcmp(obj.stageClass, 'Video') && ~strcmp(obj.chromaticClass, 'achromatic')
+                if strcmp(obj.stageClass, 'Video') && ~strcmp(obj.chromaticClass, 'achromatic')
                     if strcmpi(obj.temporalClass, 'sinewave')
                         colorController = stage.builtin.controllers.PropertyController(spot, 'color', ...
                             @(state)getSpotColorVideo(obj, state.time - obj.preTime * 1e-3));
@@ -251,21 +247,6 @@ classdef ContrastResponseSpot < manookinlab.protocols.ManookinLabStageProtocol
                     c = obj.backgroundIntensity;
                 end
             end
-            
-            function c = getSpotColorLcrRGB(obj, state)
-                if state.time - obj.preTime * 1e-3 >= 0
-                    v = sin(obj.temporalFrequency * time * 2 * pi);
-                    if state.pattern == 0
-                        c = obj.contrast * (v * obj.colorWeights(1)) * obj.backgroundIntensity + obj.backgroundIntensity;
-                    elseif state.pattern == 1
-                        c = obj.contrast * (v * obj.colorWeights(2)) * obj.backgroundIntensity + obj.backgroundIntensity;
-                    else
-                        c = obj.contrast * (v * obj.colorWeights(3)) * obj.backgroundIntensity + obj.backgroundIntensity;
-                    end
-                else
-                    c = obj.backgroundIntensity;
-                end
-            end
         end
         
         % This is a method of organizing stimulus parameters.
@@ -292,6 +273,8 @@ classdef ContrastResponseSpot < manookinlab.protocols.ManookinLabStageProtocol
             % Get the current contrast.
             obj.contrast = obj.sequence( obj.numEpochsCompleted+1 );
             epoch.addParameter('contrast', obj.contrast);
+            
+            disp(['Color weights: ',num2str(obj.colorWeights)]);
 
             % Add the radius to the epoch.
             if strcmp(obj.stimulusClass, 'annulus')

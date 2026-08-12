@@ -38,7 +38,7 @@ classdef ManookinLabStageProtocol < edu.washington.riekelab.protocols.RiekeLabSt
                         obj.stageClass = 'LightCrafter';
                     else
                         obj.frameRate = obj.rig.getDevice('Stage').getMonitorRefreshRate();
-                        obj.stageClass = 'LcrRGB';
+                        obj.stageClass = 'Video'; %'LcrRGB';
                     end
                 else
                     obj.frameRate = obj.rig.getDevice('Stage').getPatternRate();
