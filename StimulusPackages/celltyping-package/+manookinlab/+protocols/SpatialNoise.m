@@ -230,7 +230,7 @@ classdef SpatialNoise < manookinlab.protocols.ManookinLabStageProtocol
 
             function s = setStixelsPatternMode(obj, time)
                 if time > 0
-                    if time <= obj.uniqueTime
+                    if time <= obj.uniqueTime*1e-3
                         M = 2*(obj.noiseStream.rand(obj.numYStixels,obj.numXStixels)>0.5)-1;
                     else
                         M = 2*(obj.noiseStreamRep.rand(obj.numYStixels,obj.numXStixels)>0.5)-1;
@@ -346,7 +346,7 @@ classdef SpatialNoise < manookinlab.protocols.ManookinLabStageProtocol
 
             function p = setJitterPatternMode(obj, time)
                 if time > 0
-                    if time <= obj.uniqueTime
+                    if time <= obj.uniqueTime*1e-3
                         xy = obj.stixelShiftPix*round((obj.stepsPerStixel-1)*(obj.positionStream.rand(1,2))) ...
                             + obj.canvasSize / 2;
                     else
