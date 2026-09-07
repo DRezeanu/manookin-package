@@ -174,7 +174,7 @@ classdef SpatialNoise < manookinlab.protocols.ManookinLabStageProtocol
             p.addController(gridVisible);
             
             % Calculate preFrames and stimFrames
-            preF = floor(obj.preTime * 1e-3 * obj.frameRate);
+            preF = round(obj.preTime * 1e-3 * obj.frameRate);
 
             if strcmpi(obj.stageClass, 'LightCrafter')
                 imgController = stage.builtin.controllers.PropertyController(checkerboard, 'imageMatrix',...
